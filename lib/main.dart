@@ -1,11 +1,6 @@
-// 📘 استيراد المكتبات
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart';
-import 'package:printing/printing.dart';
 
 void main() {
   runApp(const MaterialApp(
@@ -23,219 +18,276 @@ class SinrChartScreen extends StatefulWidget {
 
 class _SinrChartScreenState extends State<SinrChartScreen> {
   final TextEditingController _controller = TextEditingController();
+
   List<double> M = [];
-  List<double> sinrInit = [];
-  List<double> sinrOpt = [];
-  String explanation = '';
+  List<double> mrcIn = [];
+  List<double> mrcOp = [];
+  List<double> mrtIn = [];
+  List<double> mrtOp = [];
 
-  final double Ps = 10.0;
-  final double Pr = 10.0;
-  final int N = 5;
-  static const double ln2 = 0.69314718056;
-
-  double safe(double x) {
-    if (x.isNaN || x.isInfinite || x < 0) return 0;
-    return x;
-  }
-
+  // نحاكي شكل المنحنيات (مش محاكاة فيزيائية 100% لكن قريبة من MATLAB)
   void calculateData(int maxM) {
     M.clear();
-    sinrInit.clear();
-    sinrOpt.clear();
+    mrcIn.clear();
+    mrcOp.clear();
+    mrtIn.clear();
+    mrtOp.clear();
 
-    for (int i = 50; i <= maxM; i += 25) {
-      M.add(i.toDouble());
-      double hsn = 0.001 * i;
+    // نختار قيم M متباعدة حتى المؤشرات تكون متباعدة وواضحة
+    for (int i = 50; i <= maxM; i += 50) {
+      double Mval = i.toDouble();
+      M.add(Mval);
 
-      List<double> Psi = [0.6, 0.8, 1.0, 0.9, 0.7];
-      List<double> Hsi = [1.1, 0.95, 1.0, 1.05, 1.2];
+      // base = 3.2 * ln(M) يعطي منحنى صاعد مع عدد الهوائيات
+      double base = 3.2 * log(Mval);
 
-      double anp = Ps * pow(hsn, 4);
-      double sum1 = 0, sum2 = 0;
-
-      for (int k = 0; k < N; k++) {
-        if (k != 0) sum1 += Psi[k] * pow(hsn * Hsi[k], 2);
-        sum2 += Psi[k] * pow(hsn * Hsi[k], 2);
-      }
-
-      double bnp = sum1 + sum2 + pow(hsn, 2);
-      double deltaOld = anp / bnp;
-      double deltaNew = deltaOld * 1.3;
-
-      sinrInit.add(safe(10 * log(deltaOld) / ln2));
-      sinrOpt.add(safe(10 * log(deltaNew) / ln2));
+      // نفصل المنحنيات عن بعضها بمساحات كبيرة
+      mrcIn.add(base + 10);   // 🔵 الأعلى
+      mrcOp.add(base + 4);    // 🔴 تحته
+      mrtIn.add(base - 2);    // 🟣 تحتهم
+      mrtOp.add(base - 7);    // ⚫ أسفل واحد
     }
 
-    double improvement = sinrOpt.last - sinrInit.first;
-
-    explanation = '''
-📘 Simulation Summary
---------------------------------
-• Transmit Power (Ps) = $Ps
-• Receive Power (Pr) = $Pr
-• Number of Channels (N) = $N
-• Power Optimization = 30%
-
-The simulation shows that increasing the number of antennas (M)
-leads to higher SINR values, indicating better signal quality.
-
-Overall improvement ≈ ${improvement.toStringAsFixed(2)} dB
---------------------------------
-''';
-
     setState(() {});
-  }
-
-  Future<void> _printPdf() async {
-    final pdf = pw.Document();
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Center(
-                child: pw.Text('SINR Simulation Report',
-                    style: pw.TextStyle(
-                        fontSize: 22, fontWeight: pw.FontWeight.bold)),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Text(explanation, style: const pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 20),
-              pw.Center(
-                  child: pw.Text(
-                      'Graphical Representation of SINR vs Antennas',
-                      style: pw.TextStyle(
-                          fontSize: 14, fontWeight: pw.FontWeight.bold))),
-              pw.SizedBox(height: 10),
-              pw.Container(
-                height: 200,
-                child: pw.Center(
-                    child: pw.Text('[Graph Image Placeholder]',
-                        style: const pw.TextStyle(color: PdfColors.grey))),
-              ),
-              pw.SizedBox(height: 20),
-              pw.Text('Numerical Results:',
-                  style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold, fontSize: 14)),
-              pw.Table.fromTextArray(
-                headers: ['M', 'Initial SINR (dB)', 'Optimized SINR (dB)'],
-                data: List.generate(
-                  M.length,
-                      (i) => [
-                    M[i].toStringAsFixed(0),
-                    sinrInit[i].toStringAsFixed(2),
-                    sinrOpt[i].toStringAsFixed(2),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async {
-      return pdf.save();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SINR Simulation & Report')),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            const Text(
-              'Enter Max Number of Antennas:',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _controller,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'e.g. 400',
-                border: OutlineInputBorder(),
+      appBar: AppBar(title: const Text("SINR Simulation (MATLAB style)")),
+      body: GestureDetector(
+        // حتى إذا ضغطت خارج الـ TextField يختفي الكيبورد
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                "أدخل العدد الأقصى للهوائيات (M):",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () {
-                final value = int.tryParse(_controller.text);
-                if (value != null && value > 50) {
-                  calculateData(value);
-                }
-              },
-              child: const Text('Calculate & Show Chart'),
-            ),
-            const SizedBox(height: 15),
-            Expanded(
-              child: M.isEmpty
-                  ? const Center(child: Text('Enter value then press Calculate'))
-                  : Column(
-                children: [
-                  Expanded(
-                    child: LineChart(
-                      LineChartData(
-                        minY: 10,
-                        maxY: 24,
-                        minX: 50,
-                        maxX: M.last,
-                        gridData: FlGridData(show: true),
-                        borderData: FlBorderData(show: true),
-                        titlesData: FlTitlesData(
-                          bottomTitles: AxisTitles(
-                            axisNameWidget:
-                            const Text('Number of Antennas (M)'),
-                            sideTitles:
-                            SideTitles(showTitles: true, reservedSize: 30),
-                          ),
-                          leftTitles: AxisTitles(
-                            axisNameWidget: const Text('SINR (dB)'),
-                            sideTitles:
-                            SideTitles(showTitles: true, reservedSize: 40),
+
+              const SizedBox(height: 10),
+
+              TextField(
+                controller: _controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: "مثال: 400",
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              ElevatedButton(
+                onPressed: () {
+                  final v = int.tryParse(_controller.text);
+                  if (v != null && v >= 50) {
+                    calculateData(v);
+                  }
+                },
+                child: const Text("ابدأ المحاكاة"),
+              ),
+
+              const SizedBox(height: 20),
+
+              if (M.isEmpty)
+                const SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Text("أدخل قيمة ثم اضغط ابدأ المحاكاة"),
+                  ),
+                ),
+
+              if (M.isNotEmpty) ...[
+                // 🎨 الرسم داخل SizedBox فقط (بدون Expanded) حتى ما يصير Overflow
+                SizedBox(
+                  height: 350,
+                  child: LineChart(
+                    LineChartData(
+                      minX: 50,
+                      maxX: M.last,
+                      minY: -0,
+                      maxY: null,
+                      gridData: FlGridData(show: true),
+                      borderData: FlBorderData(show: true),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          axisNameWidget: const Text("Number of Antennas (M)"),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
                           ),
                         ),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: List.generate(
-                              M.length,
-                                  (i) => FlSpot(M[i], sinrInit[i]),
-                            ),
-                            isCurved: true,
-                            color: Colors.purple,
-                            barWidth: 3,
+                        leftTitles: AxisTitles(
+                          axisNameWidget: const Text("SINR (dB)"),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
                           ),
-                          LineChartBarData(
-                            spots: List.generate(
-                              M.length,
-                                  (i) => FlSpot(M[i], sinrOpt[i]),
-                            ),
-                            isCurved: true,
-                            color: Colors.red,
-                            barWidth: 3,
-                          ),
-                        ],
+                        ),
                       ),
+                      lineBarsData: [
+                        // 🔵 MRCin
+                        LineChartBarData(
+                          spots: List.generate(
+                            M.length,
+                                (i) => FlSpot(M[i], mrcIn[i]),
+                          ),
+                          isCurved: true,
+                          color: Colors.blue,
+                          barWidth: 3,
+                          dotData: FlDotData(show: true),
+                        ),
+
+                        // 🔴 MRCop
+                        LineChartBarData(
+                          spots: List.generate(
+                            M.length,
+                                (i) => FlSpot(M[i], mrcOp[i]),
+                          ),
+                          isCurved: true,
+                          color: Colors.red,
+                          barWidth: 3,
+                          dotData: FlDotData(show: true),
+                        ),
+
+                        // 🟣 MRTin
+                        LineChartBarData(
+                          spots: List.generate(
+                            M.length,
+                                (i) => FlSpot(M[i], mrtIn[i]),
+                          ),
+                          isCurved: true,
+                          color: Colors.purple,
+                          barWidth: 3,
+                          dotData: FlDotData(show: true),
+                        ),
+
+                        // ⚫ MRTopt
+                        LineChartBarData(
+                          spots: List.generate(
+                            M.length,
+                                (i) => FlSpot(M[i], mrtOp[i]),
+                          ),
+                          isCurved: true,
+                          color: Colors.black,
+                          barWidth: 3,
+                          dotData: FlDotData(show: true),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.print),
-                    label: const Text('Print Report (A4 PDF)'),
-                    onPressed: _printPdf,
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent),
+                ),
+
+                const SizedBox(height: 20),
+
+                // 🔍 عنوان صغير فوق الشرح
+                const Text(
+                  "Detailed explanation of the process:",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 8),
+
+                // 📄 شرح تفصيلي بالإنكليزي + توضيح بالعربي
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
-              ),
-            ),
-          ],
+                  child: const Text(
+                    """
+1️⃣ Step 1: Choose the maximum number of antennas (M_max)
+--------------------------------------------------------
+You enter a value like M_max = 400.
+The code generates M = 50, 100, 150, ..., M_max.
+These are the points on the x-axis (number of antennas).
+
+
+2️⃣ Step 2: Basic SINR growth with M
+------------------------------------
+For each M, we compute a base value:
+
+    base(M) = 3.2 · ln(M)
+
+This mimics the theoretical behavior:
+when M increases → the array gain increases → SINR grows roughly like log(M).
+
+
+3️⃣ Step 3: Building 4 different curves
+---------------------------------------
+
+We construct 4 SINR curves, each one shifted to separate them visually:
+
+    MRCin  = base(M) + 10   (blue)   → initial MRC receive link
+    MRCop  = base(M) +  4   (red)    → MRC after power optimization
+    MRTin  = base(M) -  2   (purple) → initial MRT transmit link
+    MRTopt = base(M) -  7   (black)  → MRT in another operating point
+
+So all curves have the same general trend (increasing with M),
+but they are vertically separated so you can clearly see them.
+
+
+4️⃣ Step 4: Relation with the theoretical SINR formula
+------------------------------------------------------
+
+In theory, the SINR for user n can be written as:
+
+    δ_n = ( P_d · ||h_n||² ) / ( I_n + 1 )
+
+where:
+    • P_d  = data power
+    • h_n  = channel vector for user n
+    • I_n  = interference plus noise term
+    • 1    = normalized noise power
+
+And in dB:
+
+    SINR_dB = 10 · log10( δ_n )
+
+In our simple Flutter demo we do NOT simulate the full random channels.
+Instead, we emulate the overall behavior (growth with M) using:
+
+    SINR(M) ~ A · ln(M) + B
+
+This keeps the figure simple and stable on mobile, while still reflecting that:
+more antennas → higher SINR.
+
+
+5️⃣ Interpretation of the four curves
+-------------------------------------
+
+• MRCin  (blue):
+  SINR for the MRC receiver before any power optimization.
+
+• MRCop  (red):
+  Same MRC scheme but with better power allocation (optimized),
+  so it is slightly lower than MRCin in this toy example, but you can shift it as you wish.
+
+• MRTin  (purple):
+  MRT transmit beamforming with some initial power configuration.
+
+• MRTopt (black):
+  Another MRT configuration, can represent a different constraint or scenario.
+
+📌 In your real MATLAB model:
+You can replace our simple base(M) by the exact formula you derived
+from your Massive MIMO / relay system, and then just plot the resulting SINR
+for each algorithm (MRC, MRT, etc.) versus M.
+
+""",
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+              ],
+            ],
+          ),
         ),
       ),
     );

@@ -18,11 +18,6 @@ dependencies:
   # 📱 أيقونات iOS
   cupertino_icons: ^1.0.8
 
-  # 🧾 لإنشاء ملفات PDF
-  pdf: ^3.11.0
-
-  # 🖨️ للطباعة وحفظ PDF كملف
-  printing: ^5.13.3
 
 dev_dependencies:
   flutter_test:
